@@ -1,0 +1,16 @@
+HTTP框架的初始化
+1> 初始化所有HTTP模块的ctx_index序号
+2> 分配解析main级别配置项时存放HTTP模块结构体指针的3个数组（ngx_http_conf_ctx_t结构体，每个模块对应一个）
+3> 依次调用所有HTTP模块的create_main_conf方法（产生的配置放置到main_conf数组中）
+4> 依次调用所有HTTP模块的create_srv_conf方法（产生的配置放置到srv_conf数组中）
+5> 依次调用所有HTTP模块的create_loc_conf方法（产生的配置放置到loc_conf数组中）
+6> 依次调用所有HTTP模块的preconfiguration方法
+7> 解析http{}模块下的所有main级别配置项
+8> 调用所有HTTP模块的init_main_conf方法
+9> 调用ngx_http_merge_servers方法合并配置，合并main,svr,loc级别下server,location相关的配置项
+10> 构造location组成的静态二叉平衡查找树
+11> 初始化可添加处理方法的7个HTTP阶段的动态数组
+12> 依次调用所有HTTP模块的postconfiguration方法使之可以介入HTTP阶段（将自己的ngx_http_handler_pt处理方法添加到以上7个HTTP阶段中）
+13> 根据各HTTP模块介入的处理方法构造出phase_engine_handlers数组（11个phases数组方法成员遍历后构成的动态数组）
+14> 构造server虚拟主机构成的支持通配符的散列表
+15> 构造监听端口与server间的关联关系，设置新连接事件的回调方法为ngx_http_init_connection

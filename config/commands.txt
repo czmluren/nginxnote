@@ -1,0 +1,64 @@
+1、nginx仅有几个命令行参数，完全通过配置文件来配置
+  -c </path/to/config> 为 Nginx 指定一个配置文件，来代替缺省的。
+  -t 不运行，而仅仅测试配置文件。nginx 将检查配置文件的语法的正确性，并尝试打开配置文件中所引用到的文件。
+  -v 显示 nginx 的版本。
+  -V 显示 nginx 的版本，编译器版本和配置参数。
+
+
+2、控制
+  nginx启动命令
+      sudo /usr/local/nginx/nginx     (nginx二进制文件绝对路径，可以根据自己安装路径实际决定)
+
+  nginx停止命令
+  nginx从容停止命令，等所有请求结束后关闭服务
+      ps -ef |grep nginx
+      kill -QUIT  nginx主进程号
+  nginx 快速停止命令，立刻关闭nginx进程
+      ps -ef |grep nginx
+      kill -TERM nginx主进程号 
+  如果以上命令不管用，可以强制停止
+      kill -9 nginx主进程号
+  如果嫌麻烦可以不用查看进程号，直接使用命令进行操作
+  其中/usr/local/nginx/nginx.pid 为nginx.conf中pid命令设置的参数，用来存放nginx主进程号的文件
+      kill -信号类型(HUP|TERM|QUIT) `cat /usr/local/nginx/nginx.pid` 
+  例如:
+      kill -QUIT `cat /usr/local/nginx/nginx.pid`
+    
+  nginx重启命令
+  nginx重启可以分成几种类型
+  1.简单型，先关闭进程，修改你的配置后，重启进程。
+      kill -QUIT `cat /usr/local/nginx/nginx.pid`
+      sudo /usr/local/nginx/nginx
+  2.重新加载配置文件，不重启进程，不会停止处理请求
+      /usr/local/nginx/sbin/nginx -s reload
+  3.平滑更新nginx二进制，不会停止处理请求
+
+
+3、升级
+(a) 先用新程序替换旧程序文件
+(b) kill -USR2 旧版程序的主进程号或者进程文件名
+     此时旧的nginx主进程会把自己的进程文件改名为.oldbin，然后执行新版nginx，此时新旧版本同时运行
+(c) kill -WINCH 旧版本主进程号
+(d) 不重载配置启动新/旧工作进程
+       kill -HUP 旧/新版本主进程号
+    从容关闭旧/新进程
+　　   kill -QUIT 旧/新进程号
+    快速关闭旧/新进程
+       kill -TERM 旧/新进程号
+
+
+4、nginx控制信号
+    可以使用信号系统来控制主进程。默认，nginx 将其主进程的 pid 写入到 /usr/local/nginx/nginx.pid 文件中。通过传递参数给 ./configure 或使用 pid 指令，来改变该文件的位置。
+主进程可以处理以下的信号：
+  TERM, INT	快速关闭
+  QUIT	从容关闭
+  HUP	重载配置，用新的配置开始新的工作进程，从容关闭旧的工作进程
+  USR1	重新打开日志文件
+  USR2	平滑升级可执行程序。
+  WINCH	从容关闭工作进程
+尽管你不必自己操作工作进程，但是，它们也支持一些信号：
+  TERM, INT	快速关闭
+  QUIT	从容关闭
+  USR1	重新打开日志文件
+
+

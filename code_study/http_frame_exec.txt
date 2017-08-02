@@ -1,0 +1,37 @@
+ngx_http_init_request:
+1> 构造 ngx_http_request_t 结构体,并初始化
+2> 修改读事件的回调方法为 ngx_http_process_request_line 并调用该方法开始接收并解析HTTP请求行
+
+ngx_http_process_request_line: 
+1> 判断读事件是否超时，超时则调用 ngx_http_close_request 结束请求
+2> 作为读事件回调方法，反复接收TCP流并使用状态机解析，直到确认接收到完整的HTTP请求行这个阶段才完成，继续进入下一个阶段接收HTTP头部
+3> 此方法至少被调用一次
+4> 调用 ngx_http_parse_request_line 解析http头部，通过方法名、版本信息等决定下一步函数调用
+5> 接收完HTTP请求行，此时将读事件的回调方法设置为 ngx_http_process_request_headers 准备接收HTTP头部
+
+ngx_http_process_request_headers:
+1> 接收较大的HTTP头部时，有可能会被反复多次调用
+2> 判断读事件是否超时，超时则调用 ngx_http_close_request 结束请求
+3> 调用 ngx_http_parse_header_line 解析HTTP头部
+3> 通过host字段，调用 ngx_http_find_virtual_server 找到对应的虚拟主机配置块，会重新设置srv_conf,loc_conf成员
+4> 调用 ngx_http_process_request 方法开始使用各HTTP模块正式的在业务上处理HTTP请求
+
+ngx_http_process_request:
+1> 定时器中移除读事件,同时将读事件和写事件的回调方法都设置为 ngx_http_request_handler 方法
+2> 设置 ngx_http_request_t 结构体的 read_event_handler方法为 ngx_http_block_reading
+3> 调用 ngx_http_core_run_phases 方法集成 HTTP 模块处理请求，会执行每个 ngx_http_phase_handler_t 处理阶段的checker方法，handler方法仅能在checker方法中调用
+   当某个checker返回了NGX_OK，则将会把控制权交还个nginx框架，当这个请求对应的事件再次触发时，HTTP框架将不会再调用 ngx_http_process_request 处理请求，而是由 ngx_http_request_handler 方法开始处理
+4> 调用 ngx_http_run_posted_requests 方法执行POST请求
+
+ngx_http_run_posted_requests:
+1> post请求就是用于subrequest子请求机制的
+2> ngx_http_request_t中count表示没当派生出子请求时，原始请求的count会加1，count为0时才销毁原始请求
+3> 子请求放置在单链表中
+
+ngx_http_read_client_request_body: 接收请求包体，只需调用一次，多次调用是通过 ngx_http_read_client_request_body_handler(对HTTP模块不可见)
+ngx_http_discard_request_body: 丢弃请求包体
+  注: ngx_http_read_client_request_body_handler 和 ngx_http_discard_request_body 有很多共通之处，都是调用 ngx_http_do_read_client_request_body 负责从套接字缓存区读取包体工作
+ngx_http_send_header: 负责构造HTTP响应行、头部，同时会将它们发送给客户端，会调用过滤头模块的 ngx_http_header_filter 方法
+ngx_http_output_filter: 用于发送响应包体，第二个参数就是用于存放响应包体的缓冲区
+ngx_http_close_connection: 用于是否TCP连接
+ngx_http_free_request: 释放请求对应的 ngx_http_request_t 数据结构，一定先于 ngx_http_close_connection 调用

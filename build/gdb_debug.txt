@@ -1,0 +1,62 @@
+下载源码， 解压后编译（确认gcc编译参数加-g：auto/cc/conf[ngx_compile_opt="-c" --> ngx_compile_opt="-c -g"]）
+./configure --sbin-path=/home/aca/nginx/nginx \
+--prefix=/home/aca/nginx \
+--with-pcre=/home/code/pcre-8.38 \
+--with-zlib=/home/code/zlib-1.2.8 \
+--with-openssl=/home/code/openssl-1.0.1c \
+--with-http_ssl_module \
+--with-http_flv_module \
+--with-http_mp4_module \
+--with-debug
+make && make  install
+注：nginx的一个 杀手级特性 就是你能使用 debug_connection 指令只调试 某些 连接。这个设置只有是你使用 --with-debug 编译的nginx才有效。
+
+方法一(建议使用此方法)：
+1> nginx提供了单进程模型和非守护进程的方式，由两个配置选项来控制： 
+守护进程配置: 
+    daemon on | off  ;   default: on 
+多进程配置： 
+    master_process on | off   ;   default: on
+
+2> 接下来配置 nginx.conf 文件
+在下面添加3行：
+error_log   logs/error.log  debug;   # 只记录调试日志
+master_process   off;     # 简化调试 此指令不得用于生产环境
+daemon     off;    # 简化调试 此指令可以用到生产环境
+
+3> 接下来 gdb  nginx
+    $gdb ./nginx
+   (gdb) break function #打断点
+   (gdb) run    回车 即可正常设置断点， 查看日志了。
+
+
+方法二：
+1> 先启动nginx
+2> gcore 18237(worker pid) 生成core文件core.18237
+3> 停掉nginx 
+   ./nginx -s stop（或者直接使用kill）
+4> gdb调试core
+   $gdb ./nginx --core 'core.18237'
+   (gdb) break function #打断点
+   (gdb) r #run，从main函数开始运行程序
+5> 此时进入另一个终端查看进程情况，看到已经启动了一个nginx了
+   ps -efww|grep nginx
+6> 最后直接gdb调试nginx
+
+
+nginx栈值打印
+（1）由于gdb需要gcc的时候加上-g参数，这样生成的文件才能使用gdb调试，因此我们要对源码做一下小改动
+修改auto/cc/conf文件
+ngx_compile_opt="-c"
+变为
+ngx_compile_opt="-c -g"
+执行configure
+./configure --prefix=/usr/local/nginx
+ 
+（2）另一个值得关注的编译选项是-O0，如果在gdb内打印变量时提示 "<value optimized out>" 或gdb提示显示的当前正执行的代码行与源码匹配不上而让人感觉莫名其妙，那么，这则多半是因为gcc的优化导致，我们可以加上-O0选项来强制禁用gcc的编译优化。除了可以通过编辑objs/Makefile文件，把这两个选项直接加在CFLAGS变量里以外，还有另外几种方法也可以达到同样的效果。
+1． 在进行configure配置时，按如下方式执行。
+[root@localhost nginx-1.2.0]# CFLAGS="-g -O0" ./configure --prefix=/usr/local/nginx
+2． 在执行make时，按如下方式执行。
+[root@localhost nginx-1.2.0]# make CFLAGS="-g -O0" 
+直接修改objs/Makefile文件和上面提到的第2种方法是在我们已经执行configure之后进行的，如果之前已经执行过make，那么还需刷新所有源文件的时间戳，以便重新编译每一个Nginx源文件。
+

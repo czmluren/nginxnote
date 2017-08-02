@@ -1,0 +1,52 @@
+前提：安装nginx服务器（使用默认目录）
+
+1、启动nginx服务
+　　命令： /usr/local/nginx/sbin/nginx
+
+2、重启nginx服务
+　　命令： /usr/local/nginx/sbin/nginx -s reload
+
+3、修改站点的配置文件
+　　命令： vi /usr/local/nginx/conf/nginx.conf
+
+4、多站点设置
+⑴、在 /usr/local/nginx/conf/ 下创建 vhost 目录
+　　命令： mkdir /usr/local/nginx/conf/vhost
+⑵、在 /usr/local/nginx/conf/vhost 里创建一个名字为 linlik.conf 的文件,把站点配置文件写入(请查看最下面的站点内容)
+　　命令： vi /usr/local/nginx/conf/vhost/linlik.conf
+⑶、打开 /usr/local/nginx/conf/nginx.conf 文件，在相应位置加入 include 把以上2个文件包含进来
+　　在页尾后括号上面加入一句：include vhost/*.conf; 然后保存退出并重启nginx服务
+
+5、多站点的站点配置文档内容
+如下：
+server {
+　　listen 80;
+　　#listen [::]:80;
+　　server_name jiahaolin.com www.111cn.net;
+　　index index.html index.htm index.php default.html default.htm default.php;
+　　root /www/jiahaolin;
+　　include emlog.conf;
+　　#error_page 404 /404.html;
+
+　　location ~ [^/]\.php(/|$) {
+　　    # comment try_files $uri =404; to enable pathinfo
+　　    try_files $uri =404;
+　　    fastcgi_pass unix:/tmp/php-cgi.sock;
+　　    fastcgi_index index.php;
+　　    include fastcgi.conf;
+　　    #include pathinfo.conf;
+　　}
+
+　　location ~ .*\.(gif|jpg|jpeg|png|bmp|swf)$ {
+　　    expires 30d;
+　　}
+
+　　location ~ .*\.(js|css)?$ {
+　　    expires 12h;
+　　}
+
+　　access_log /home/wwwlogs/jiahaolin.com.log access;
+}
+
+
+

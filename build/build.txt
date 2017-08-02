@@ -1,0 +1,80 @@
+前提(建立nginx 组)：
+　　groupadd -r nginx
+　　useradd -s /sbin/nologin -g nginx -r nginx
+　　id nginx
+
+
+1.选定源码目录
+可以是任何目录，本文选定的是/usr/local/src
+cd /usr/local/src
+
+2.安装PCRE库（支持地址重写rewrite功能）
+ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/ 下载最新的 PCRE 源码包，使用下面命令下载编译和安装 PCRE 包：
+cd /usr/local/src
+wget ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.38.tar.gz 
+tar -zxvf pcre-8.38.tar.gz
+cd pcre-8.38
+./configure --prefix=/usr/local
+make && make install
+
+3.安装zlib库（nginx提供gzip模块，需要zlib库支持）
+http://zlib.net/zlib-1.2.8.tar.gz 下载最新的 zlib 源码包，使用下面命令下载编译和安装 zlib包：
+cd /usr/local/src
+wget http://zlib.net/zlib-1.2.8.tar.gz
+tar -zxvf zlib-1.2.8.tar.gz
+cd zlib-1.2.8
+./configure --prefix=/usr/local
+make && make install
+
+4.安装ssl（某些vps默认没装ssl，nginx提供ssl功能)
+cd /usr/local/src
+wget http://www.openssl.org/source/openssl-1.0.1c.tar.gz
+tar -zxvf openssl-1.0.1c.tar.gz
+cd openssl-1.0.1c/
+./config  --prefix=/usr/local --openssldir=/usr/local/ssl
+make && make install
+./config shared --prefix=/usr/local --openssldir=/usr/local/ssl
+make clean
+make && make install
+
+5.安装nginx（官网下载地址: http://nginx.org/）
+Nginx 一般有两个版本，分别是稳定版和开发版，您可以根据您的目的来选择这两个版本的其中一个，下面是把 Nginx 安装到 /usr/local/nginx 目录下的详细步骤：
+cd /usr/local/src
+wget http://nginx.org/download/nginx-1.4.2.tar.gz
+tar -zxvf nginx-1.4.2.tar.gz
+cd nginx-1.4.2
+./configure --sbin-path=/usr/local/nginx/sbin/nginx \
+--conf-path=/usr/local/nginx/conf/nginx.conf \
+--pid-path=/usr/local/nginx/logs/nginx.pid \
+--with-http_ssl_module \
+--with-pcre=/usr/local/src/pcre-8.38 \
+--with-zlib=/usr/local/src/zlib-1.2.8 \
+--with-openssl=/usr/local/src/openssl-1.0.1c
+
+make clean
+make && make install
+
+    其中：
+--with-pcre=/usr/src/pcre-8.38 指的是pcre-8.38 的源码路径。
+--with-zlib=/usr/src/zlib-1.2.7 指的是zlib-1.2.7 的源码路径。
+
+安装成功后 /usr/local/nginx 目录下如下
+conf:
+    fastcgi.conf            koi-win               nginx.conf.default
+    fastcgi.conf.default    uwsgi_params.default  scgi_params
+    fastcgi_params          mime.types            scgi_params.default
+    fastcgi_params.default  mime.types.default    uwsgi_params
+    koi-utf                 nginx.conf          win-utf
+html:                   
+sbin:
+    nginx
+logs:
+
+
+6.启动
+确保系统的 80 端口没被其他程序占用，运行/usr/local/nginx/nginx 命令来启动 Nginx，
+netstat -ano|grep 80
+如果查不到结果后执行，有结果则忽略此步骤（ubuntu下必须用sudo启动，不然只能在前台运行）
+sudo /usr/local/nginx/nginx
+打开浏览器访问此机器的 IP，如果浏览器出现 Welcome to nginx! 则表示 Nginx 已经安装并运行成功。
+

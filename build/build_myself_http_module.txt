@@ -1,0 +1,91 @@
+方法一:添加config脚本
+1> 首先把源代码文件全部放到一个目录下，然后在改目录中编写一个config用于通知Nginx如何编译本模块，这个文件名必须为config。
+2> 在configure脚本执行时加入参数--add-module=PATH(上面源码，config的保存目录)
+如: ./configure --sbin-path=/home/aca/nginx/nginx \
+      --prefix=/home/aca/nginx \
+      --add-module=/home/code/nginx-1.11.5/mymodule \
+      --with-debug
+3> 执行正常安装流程是完成Nginx的编译工作。
+4> config的写法(其实config就是一个shell脚本)：
+若是只想开发一个HTTP模块，需要定义3个变量
+    1.ngx_addon_name: 仅在configure执行时使用，一般设置为模块名称。
+    2.HTTP_MODULES: 保存所有HTTP模块名称，空格符相连。重新设置时不要覆盖，只需要添加
+        例: "$HTTP_MODULES ngx_http_my_test_module"
+    3.NGX_ADDON_SRCS: 用于指定模块的源代码，空格符相连。注意:设置时可以使用$ngx_addon_dir变量，等价于configure执行时的--add-module=PATH.
+对于mytest模块的config示例：
+ngx_addon_name=ngx_http_mytest_module
+HTTP_MODULES="$HTTP_MODULES ngx_http_mytest_module"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_mytest_module.c"
+
+下面声明一个重点:
+以上的3个变量并不是唯一可以再config中自定义的部分，如果开发一个HTTP过滤模块，则需要用 HTTP_FILTER_MODULES 替代 HTTP_MODULES
+    $CORE_MODULES: 核心模块
+    $EVENT_MODULES: 事件模块
+    $HTTP_MODULES: HTTP模块
+    $HTTP_FILTER_MODULES: HTTP过滤模块
+    $HTTP_HEADERS_FILTER_MODULES: HTTP头部过滤模块.
+另外一个可以使用的变量$NGX_ADDON_DEPS: 指定模块依赖路径。
+
+
+方法二:利用configure脚本将制定的模块加入nginx中
+1> 首先nginx是通过configure生成程序的
+在configure中。
+    .auto/modules
+    .auto/make
+这2行代码是将第三方模块加入到nginx中
+2> configure如何利用config文件加入nginx中
+    --add-module=*)    NGX_ADDONS="$NGX_ADDONS $value" ;;
+在configure命令执行到auto/modules脚本时,将生成ngx_modules.c文件中加入制定的第三方模块。
+下面是部分源码：
+if test -n "$NGX_ADDONS";then
+    echo configuring addtional  modules
+    for ngx_addon_dir in $NGX_ADDONS
+    do
+        echo "adding module in $ngx_addon_dir"
+        if test -f $ngx_addon_dir/config; then
+            .$ngx_addon_dir/config
+            echo "+ $nginx_addon_name was configured"
+        else
+            echo "错误信息"
+            exit 1
+         fi
+    done
+fi
+当遍历config文件后。就会在 ngx_modules.c 中定义一个 ngx_module_t *ngx_modules[] 数组，通过处理请求时的循环访问数组确定该用哪一个模块来处理。
+最后就是auto/make把相关模块编译进nginx。
+
+
+方法三：直接修改Makefile文件
+适用于我们需要重新决定 ngx_module* ngx_modules[] 数组中各模块的顺序，或者在编译源代码时需要加入一些独特的编译选项，那么可以再执行完 configure 后，对 objs/ngx_modules.c 和 objs/Makefile 文件直接进行修改
+1> 首先，当我们要修改 objs/ngx_modules.c 时候，需要新增第三方模块的声明
+    extern ngx_module_t ngx_http_mytest_module;
+2> 然后合适的地方将模块加到 ngx_modules 数组中
+ngx_modules_t *ngx_modules[] = {
+    ...
+    &ngx_http_upstream_ip_hash_module,
+    &ngx_http_mytest_module,
+    $ngx_http_write_filter_module,
+    ...
+    NULL
+};
+注意: 我们模块加入的顺序十分重要，如果同时有两个模块对同一个请求处理，那么只有顺序在前面的模块会被调用
+最后就是修改Makefile.
+objs/addon/httpmodule/ngx_http_mytest_module.o:$(ADDON_DEPS)\
+    ../sample/httpmodule/ngx_http_mytest_module.c
+    $(CC) -c $(CFLAGS) $(ALL_INCS) \
+           -o objs/addon/httpmodule/ngx_http_mytest_module.o\
+           ../sample/httpmodule//ngx_http_mytest_module.c
+然后把目标文件链接到Nginx中
+objs/nginx:   objs/src/core/nginx.o
+...
+    objs/addon/httpmodule/ngx_http_mytest_module.o\
+    objs/ngx_modules.o
+    
+    $(LINK) -o objs/nginx\
+    objs/src/core/nginx.o\
+    ...
+    objs/addon/httpmodule/ngx_http_mytest_module.o\
+    objs/ngx_modules.o\
+    -lpthread -lcrypt -lpcre -lcrypto -lcrypto -lz
+这个是修改文件，所以不正确的修改可能导致nginx出错，所以慎用
+
